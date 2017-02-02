@@ -21,7 +21,12 @@ def parse_mail_from_command(line):
         print("ERROR -- mail-from-cmd")
         return False
 
-    index = index+whitespace(line)              #allows for as much whitespace and updates the index
+    startind = index
+    whitespace(line)
+
+    if startind == index:
+        print ("ERROR -- mail-from-cmd")
+        return False
 
     if line[index:index+4] == "FROM":
         index += 4
@@ -37,14 +42,14 @@ def parse_mail_from_command(line):
         print("ERROR -- mail-from-cmd")
         return False
 
-    index = index+whitespace(line)
+    whitespace(line)
 
     if not path(line):                         #once it recieves any error,
         return False
 
     if not crlf(line[index]):
         if char(line[index]) or sp(line[index]) or special(line[index]):            #makes sure there aren't any other characters after the path
-            print "ERROR -- mail-from-cmd"
+            print "500 Syntax error: command unrecognized"
             return False
 
         else:
@@ -57,13 +62,9 @@ def parse_mail_from_command(line):
 def whitespace(word):
 
     global index
-    counter = 0
 
     while word[index] == " ":
-        counter += 1
         index += 1
-
-    return counter
 
 
 def path(line):
