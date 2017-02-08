@@ -8,11 +8,54 @@ import Parse
 # don't exit, either wait for current command or start message all over, be ready to read input
 # priority of errors: syntax, out of order, the arguments
 # what is null space? after data can there be white space?
+# use a list to check everything with the list--> while loop, and everything
 
 
 def mail_messages():
 
-    mail = sys.stdin.readlines()
+    allowed = ["MF"]
+    RTcount = 0
+    recipients = []
+    DTcount = 0
+    mailfrom = ""
+
+    for line in sys.stdin.readlines():
+        print line
+        code=Parse.parse_command(line)
+
+        if code == "500":
+            print "500 Syntax error: command unrecognized"
+            return False
+        elif code not in allowed:
+            print "503 Bad sequence of commands"
+            return False
+
+        if not Parse.parse_line(line, code):
+            print "501 Syntax error in parameters or arguments"
+            return False
+
+        if code == "RT":
+            recipients[RTcount] = line
+            RTcount += 1
+
+        if allowed == ["MF"]:
+            mailfrom = line
+            allowed = ["RT"]
+        elif allowed == ["RT"]:
+            allowed = ["RT", "DT"]
+        elif code == "DT":
+            allowed = []
+
+
+# how do i change state???/ how do i change the allowed depending on what it was before?
+# how to check for data messages ??
+
+
+
+
+
+    mail= sys.stdin.readlines()
+
     mfcode = Parse.parse_command(mail[0])
 
     if mfcode == "500":
