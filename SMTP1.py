@@ -1,139 +1,111 @@
 import sys
 import Parse
+'''
+run state machine
+Start ---> MF ---> RT ---> DT ---> Text ---> Dot ---> End
+            ^       ^   |             ^   |        |
+            |       +---+             +---+        |
+            |                                      |
+            +--------------------------------------+
+'''
+def main():
 
-# do we have to keep stdin open after the period?? for another message?
-# how do we know the client is done sending?
-# check for end of file; but keep on receiving until then (control + D)
-# if something throws an error, should we just leave the entire thing?
-# don't exit, either wait for current command or start message all over, be ready to read input
-# priority of errors: syntax, out of order, the arguments
-# what is null space? after data can there be white space?
-# use a list to check everything with the list--> while loop, and everything
+	#allowed state transitions
+	#each state has a dictionary of <cmd> : <new state>
 
+	#EOF: END was added int the DOT because I oringially threw an error if it gave an icomplete mail message
+	#kept the above still part of the dictionary in case for future use
+    allowed = {
+        'START': {'MAIL': 'MF'},
+        'MF': {'RCPT': 'RT'},
+        'RT': {'RCPT': 'RT', 'DATA': 'DT'},
+        'DT': {'*': 'Text'},
+        'Text': {'*': 'Text', '.': 'DOT'},
+        'DOT': {'MAIL': 'MF', 'EOF': 'END'}
+    }
 
-def mail_messages():
+    state = 'START'
 
-    allowed = ["MF"]
-    RTcount = 0
+    mailfrom = ''
+
+    #empy lists to hold recipients and the email message to be able to write to file later on
     recipients = []
-    DTcount = 0
-    mailfrom = ""
-
-    for line in sys.stdin.readlines():
-        print line
-        code=Parse.parse_command(line)
-
-        if code == "500":
-            print "500 Syntax error: command unrecognized"
-            return False
-        elif code not in allowed:
-            print "503 Bad sequence of commands"
-            return False
-
-        if not Parse.parse_line(line, code):
-            print "501 Syntax error in parameters or arguments"
-            return False
-
-        if code == "RT":
-            recipients[RTcount] = line
-            RTcount += 1
-
-        if allowed == ["MF"]:
-            mailfrom = line
-            allowed = ["RT"]
-        elif allowed == ["RT"]:
-            allowed = ["RT", "DT"]
-        elif code == "DT":
-            allowed = []
-
-
-# how do i change state???/ how do i change the allowed depending on what it was before?
-# how to check for data messages ??
-
-
-
-
-
-    mail= sys.stdin.readlines()
-
-    mfcode = Parse.parse_command(mail[0])
-
-    if mfcode == "500":
-        print "500 Syntax error: command unrecognized"
-        return False
-    elif mfcode == "MF":
-        print "250 OK"
-    else:
-        print "503 Bad sequence of commands"
-
-    recipients = []
-    counter = 0
-    index = 1
-
-    while True:
-        rcptcode = Parse.parse_command(mail[index])
-
-        if rcptcode == "500":
-            print "500 Syntax error: command unrecognized"
-            return False
-        elif rcptcode == "DT":
-            if counter == 0:
-                print "503 Bad sequence of commands"
-                return False
-            else:
-                index += 1
-                break
-        elif rcptcode == "MF":
-            print "503 Bad sequence of commands"
-            return False
-
-        if not Parse.parse_line(mail[index], rcptcode):
-            print "501 Syntax error in parameters or arguments"
-            return False
-
-        print "250 OK"
-        recipients[counter] = mail[index]
-        counter += 1
-        index += 1
-
     data_message = []
-    counter = 0
 
-    while True:
+    for line in sys.stdin:
 
-        if end_line(mail[index]):
-            print mail[index]
+        print line
+
+        #text is the only thing that doesn't need to be validated or stopped untl the end line
+        #if text, assign that a cmd; if not, parse line to find out what cmd it has
+
+        if '*' in allowed[state].keys():
+            cmd = '.' if line.rstrip() == '.' else '*'
+        else:
+        	'''
+        	parse_command returns what type of command it is
+        	if none, the command was unrecognizable (500)
+        	then check in dictionary to see if cmd is allowed in particular state
+        	'''
+
+            cmd = Parse.parse_command(line)
+            if cmd is None:
+                print "500 Syntax error: command unrecognized"
+                continue
+
+        if cmd not in allowed[state].keys():
+            print "503 Bad sequence of commands"
+            continue
+
+
+        #checks to see if the parameters are valid
+
+        if cmd == 'MAIL' or cmd == 'RCPT':
+            if not Parse.parse_line(line, cmd):
+                print "501 Syntax error in parameters or arguments"
+                continue
+
+        #transitioning into a new state
+
+        new_state = allowed[state][cmd]
+
+        if new_state == 'DT':
+            print "354 Start mail input; end with <CLRF>.<CLRF>"
+        elif new_state == 'DOT':
             print "250 OK"
-            break
+            write_to_files(recipients, data_message, mailfrom)
+            recipients = []
+            data_message = []
+        elif new_state == 'Text':
+            data_message.append(line)
+        elif new_state == 'RT':
+            print "250 OK"
+            recipients.append(line)
+        elif new_state == 'MF':
+            print "250 OK"
+            mailfrom = line
 
-        data_message[counter] = mail[index]
-        counter += 1
-        index += 1
-
-    write_to_files(recipients,  data_message, mail[0])
-    return True
+        state = new_state
 
 
-def end_line(line):
-    return Parse.crlf(line[0]) and line[1] == "." and Parse.crlf(line[2])
-
-
+#append to file: loops through recipients and data_message
 def write_to_files(recipients, data_message, mailfrom):
 
     for address in recipients:
         filename = "forward/" + mailbox(address)
 
-        with open(filename) as f:
+        with open(filename, "a+") as f:
 
-            f.write("From: " + mailbox(mailfrom))
+            f.write("From: " + mailbox(mailfrom) + "\n")
 
             for line in recipients:
-                f.write("To: " + mailbox(line))
+                f.write("To: " + mailbox(line) + "\n")
 
             for line in data_message:
                 f.write(line)
 
 
+#gets only the mailbox out of a line of text
 def mailbox(line):
 
     ind = 0;
@@ -148,5 +120,6 @@ def mailbox(line):
 
     return line[startind+1:ind]
 
+main()
 
 

@@ -1,10 +1,11 @@
 
-
+#parse_line function makes sure the whole line is valid.
+#takes in cmd_id to know whether to pass as MAIL FROM or RCPT TO
 def parse_line(line, cmd_id):
 
-    if cmd_id == "MF":
+    if cmd_id == "MAIL":
         parse_mail_from_command(line)
-    elif cmd_id == "RT":
+    elif cmd_id == "RCPT":
         parse_rcpt_to_command(line)
 
     if not path(line):
@@ -18,18 +19,18 @@ def parse_line(line, cmd_id):
 
     return True
 
-
+#Solely finds out whether the command can be recognized
 def parse_command(line):
     if parse_mail_from_command(line):
-        return "MF"
+        return "MAIL"
     elif parse_rcpt_to_command(line):
-        return "RT"
+        return "RCPT"
     elif data_command_parse(line):
-        return "DT"
-    else:
-        return "500"
+        return "DATA"
 
+    return None
 
+#makes sure the DATA command is valid
 def data_command_parse(line):
     global index
     index = 0
@@ -41,9 +42,11 @@ def data_command_parse(line):
 
     whitespace(line)
 
-    return crlf(line[index])
+    return crlf(line)
 
 
+
+#checks validity of MAIL FROM command
 def parse_mail_from_command(line):
     global index
     index = 0
@@ -54,11 +57,13 @@ def parse_mail_from_command(line):
         return False
 
     startind = index
+
     whitespace(line)
+
     if startind == index:
         return False
 
-    if line[index:index+4] == "FROM:":
+    if line[index:index+5] == "FROM:":
         index += 5
     else:
         return False
@@ -68,6 +73,8 @@ def parse_mail_from_command(line):
     return True
 
 
+
+#checks validity of RCPT TO command in the same exact manner as the MAIL FROM
 def parse_rcpt_to_command(line):
     global index
     index = 0
@@ -82,7 +89,7 @@ def parse_rcpt_to_command(line):
     if startind == index:
         return False
 
-    if line[index:index+4] == "TO:":
+    if line[index:index+3] == "TO:":
         index += 3
     else:
         return False
@@ -92,14 +99,18 @@ def parse_rcpt_to_command(line):
     return True
 
 
-def whitespace(line):
 
+#increments index in places where any amount of whitespace is allowed
+def whitespace(line):
     global index
 
-    while line[index].isspace():
+    while index < len(line) and line[index].isspace():
         index += 1
 
 
+
+#all of the followng methods are part of the original recursive descent parsing
+#return False if not valid parameter
 def path(line):
     global index
 
@@ -163,7 +174,7 @@ def name(line):
 def let_dig_str(line, count):
     global index
 
-    if line[index + count].isalpha() | unicode(line[index + count].isnumeric()):
+    if line[index + count].isalpha() | unicode(line[index + count]).isnumeric():
         count += 1
         return let_dig_str(line, count)
 
@@ -187,7 +198,7 @@ def is_string(line, count):
 
 
 def char(character):
-    return not special(character) or character.isspace()
+    return not (special(character) or character.isspace())
 
 
 def crlf(line):
